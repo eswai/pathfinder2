@@ -2,6 +2,7 @@ package ui
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -136,6 +137,10 @@ func (app *App) handleKey(ev *tcell.EventKey) bool {
 		case 'z':
 			if app.focused == focusBuffer {
 				app.removeFromBuffer()
+			}
+		case 'o':
+			if app.focused == focusFilelist {
+				app.openWithApp()
 			}
 		}
 	case tcell.KeyTab:
@@ -706,4 +711,14 @@ func (app *App) drawPreview(x0, y0, x1, y1 int) {
 	for i, l := range lines {
 		drawText(app.screen, x0, y0+i, x1, l, stDefault)
 	}
+}
+
+func (app *App) openWithApp() {
+	if app.flCursor >= len(app.fileList) {
+		return
+	}
+	e := app.fileList[app.flCursor]
+	path := filepath.Join(app.curDir, e.Name)
+	cmd := exec.Command("open", path)
+	cmd.Start()
 }
