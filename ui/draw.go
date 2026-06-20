@@ -3,6 +3,7 @@ package ui
 import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-runewidth"
+	"golang.org/x/text/unicode/norm"
 )
 
 // drawBox draws a border rectangle. title is drawn in the top edge.
@@ -26,7 +27,7 @@ func drawBox(s tcell.Screen, x0, y0, x1, y1 int, borderSt, titleSt tcell.Style, 
 	// title in top edge
 	if title != "" {
 		tx := x0 + 2
-		for _, r := range " " + title + " " {
+		for _, r := range norm.NFC.String(" "+title+" ") {
 			if tx >= x1 {
 				break
 			}
@@ -40,7 +41,7 @@ func drawBox(s tcell.Screen, x0, y0, x1, y1 int, borderSt, titleSt tcell.Style, 
 // clipping to [x0..x1]. Returns the next x position after the text.
 func drawText(s tcell.Screen, x, y int, maxX int, text string, st tcell.Style) {
 	cx := x
-	for _, r := range text {
+	for _, r := range norm.NFC.String(text) {
 		w := runewidth.RuneWidth(r)
 		if cx+w > maxX {
 			break

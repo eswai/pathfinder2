@@ -8,6 +8,8 @@ import (
 
 	"github.com/eswai/pathfinder2/core"
 	"github.com/gdamore/tcell/v2"
+	"github.com/mattn/go-runewidth"
+	"golang.org/x/text/unicode/norm"
 )
 
 type inputMode struct {
@@ -766,11 +768,12 @@ func (app *App) startRename() {
 	if e.Name == ".." {
 		return
 	}
+	nfcName := norm.NFC.String(e.Name)
 	app.input = inputMode{
 		active: true,
 		prompt: "Rename:",
-		value:  []rune(e.Name),
-		cursor: len([]rune(e.Name)),
+		value:  []rune(nfcName),
+		cursor: len([]rune(nfcName)),
 		onCommit: func(name string) {
 			if name == "" || name == e.Name {
 				return
@@ -890,21 +893,23 @@ func (app *App) drawInputPopup() {
 	innerW := x1 - 1
 
 	// draw prompt label
-	prompt := app.input.prompt + " "
+	prompt := norm.NFC.String(app.input.prompt + " ")
 	px := innerX
 	for _, r := range prompt {
-		if px >= innerW {
+		w := runewidth.RuneWidth(r)
+		if px+w > innerW {
 			break
 		}
 		app.screen.SetContent(px, innerY, r, nil, stPrompt)
-		px++
+		px += w
 	}
 
 	// draw input text with cursor
 	val := app.input.value
 	cur := app.input.cursor
 	for i, r := range val {
-		if px >= innerW {
+		w := runewidth.RuneWidth(r)
+		if px+w > innerW {
 			break
 		}
 		st := stPopText
@@ -912,7 +917,7 @@ func (app *App) drawInputPopup() {
 			st = stCursor
 		}
 		app.screen.SetContent(px, innerY, r, nil, st)
-		px++
+		px += w
 	}
 	// cursor at end
 	if cur == len(val) && px < innerW {
