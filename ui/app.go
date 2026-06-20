@@ -82,7 +82,7 @@ func NewApp() (*App, error) {
 func (app *App) reloadDir() {
 	entries, err := core.ListDir(app.curDir)
 	if err != nil {
-		entries = []core.Entry{{Name: "..", IsDir: true}}
+		entries = []core.Entry{}
 	}
 	app.fileList = entries
 	if app.flCursor >= len(app.fileList) {
@@ -376,14 +376,10 @@ func (app *App) enterOrSelect() {
 	if !e.IsDir {
 		return
 	}
-	if e.Name == ".." {
-		app.navigateUp()
-	} else {
-		app.curDir = filepath.Join(app.curDir, e.Name)
-		app.flCursor = 0
-		app.flScroll = 0
-		app.reloadDir()
-	}
+	app.curDir = filepath.Join(app.curDir, e.Name)
+	app.flCursor = 0
+	app.flScroll = 0
+	app.reloadDir()
 }
 
 func (app *App) navigateUp() {
@@ -417,9 +413,6 @@ func (app *App) trashSelected() {
 		return
 	}
 	e := app.fileList[app.flCursor]
-	if e.Name == ".." {
-		return
-	}
 	target := filepath.Join(app.curDir, e.Name)
 	if err := core.MoveToTrash(target); err != nil {
 		return
@@ -436,9 +429,6 @@ func (app *App) bufferSelected() {
 		return
 	}
 	e := app.fileList[app.flCursor]
-	if e.Name == ".." {
-		return
-	}
 	path := filepath.Join(app.curDir, e.Name)
 	for _, p := range app.buffer {
 		if p == path {
@@ -732,9 +722,6 @@ func (app *App) drawPreview(x0, y0, x1, y1 int) {
 	innerH := y1 - y0
 
 	target := filepath.Join(app.curDir, e.Name)
-	if e.Name == ".." {
-		target = filepath.Dir(app.curDir)
-	}
 
 	if e.IsDir {
 		entries, err := os.ReadDir(target)
@@ -782,9 +769,6 @@ func (app *App) startRename() {
 		return
 	}
 	e := app.fileList[app.flCursor]
-	if e.Name == ".." {
-		return
-	}
 	nfcName := norm.NFC.String(e.Name)
 	app.input = inputMode{
 		active: true,

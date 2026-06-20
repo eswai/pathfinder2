@@ -30,9 +30,7 @@ func ListDir(dir string) ([]Entry, error) {
 	sort.Slice(dirs, func(i, j int) bool { return dirs[i].Name < dirs[j].Name })
 	sort.Slice(files, func(i, j int) bool { return files[i].Name < files[j].Name })
 
-	result := []Entry{{Name: "..", IsDir: true}}
-	result = append(result, dirs...)
-	result = append(result, files...)
+	result := append(dirs, files...)
 	return result, nil
 }
 
