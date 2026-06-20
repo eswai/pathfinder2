@@ -466,12 +466,12 @@ var (
 	// Polar Night
 	nord0 = tcell.NewRGBColor(0x2E, 0x34, 0x40) // background
 	nord1 = tcell.NewRGBColor(0x3B, 0x42, 0x52) // selection bg (unfocused)
-	nord3 = tcell.NewRGBColor(0x4C, 0x56, 0x6A) // dim border / dim text
+	nord3 = tcell.NewRGBColor(0x81, 0xA1, 0xC1) // dim border / dim text
 	// Snow Storm
 	nord4 = tcell.NewRGBColor(0xD8, 0xDE, 0xE9) // primary text
 	nord6 = tcell.NewRGBColor(0xEC, 0xEF, 0xF4) // bright text (selected)
 	// Frost
-	nord7  = tcell.NewRGBColor(0x8F, 0xBC, 0xBB) // focused border / teal
+	nord7  = tcell.NewRGBColor(0xD8, 0xDE, 0xE9) // focused border / teal
 	nord8  = tcell.NewRGBColor(0x88, 0xC0, 0xD0) // title
 	nord9  = tcell.NewRGBColor(0x81, 0xA1, 0xC1) // directory
 	nord10 = tcell.NewRGBColor(0x5E, 0x81, 0xAC) // selection bg (focused)
