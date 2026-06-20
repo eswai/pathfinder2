@@ -661,7 +661,7 @@ func (app *App) drawBuffer(x0, y0, x1, y1 int, focused bool) {
 		default:
 			st = stDefault
 		}
-		drawText(app.screen, x0, y0+i, x1, app.buffer[i], st)
+		drawText(app.screen, x0, y0+i, x1, filepath.Base(app.buffer[i]), st)
 	}
 }
 
