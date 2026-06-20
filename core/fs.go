@@ -1,6 +1,7 @@
 package core
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -78,6 +79,58 @@ func ReadPreview(path string, maxLines int) ([]string, error) {
 
 func Abs(path string) (string, error) {
 	return filepath.Abs(path)
+}
+
+// MoveEntry moves src into dstDir, using rename where possible.
+func MoveEntry(src, dstDir string) error {
+	dst := filepath.Join(dstDir, filepath.Base(src))
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	}
+	// Cross-device: copy then remove.
+	if err := copyEntry(src, dst); err != nil {
+		return err
+	}
+	return os.RemoveAll(src)
+}
+
+// CopyEntry recursively copies src into dstDir.
+func CopyEntry(src, dstDir string) error {
+	return copyEntry(src, filepath.Join(dstDir, filepath.Base(src)))
+}
+
+func copyEntry(src, dst string) error {
+	info, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		if err := os.MkdirAll(dst, info.Mode()); err != nil {
+			return err
+		}
+		entries, err := os.ReadDir(src)
+		if err != nil {
+			return err
+		}
+		for _, e := range entries {
+			if err := copyEntry(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name())); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
 }
 
 func HomeDir() string {
