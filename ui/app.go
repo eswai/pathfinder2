@@ -539,8 +539,10 @@ func (app *App) draw() {
 	s.Clear()
 	w, h := s.Size()
 
-	leftW := w / 5
-	midW := leftW + (w-leftW)*2/3
+	// Pane boundaries with 1-char gaps so each frame is visually independent.
+	// col1 = right edge of bookmarks pane, col2 = right edge of filelist pane
+	col1 := w / 4
+	col2 := col1 + 1 + (w-col1-2)*4/7
 
 	bmFocused := app.focused == focusBookmarks
 	flFocused := app.focused == focusFilelist
@@ -562,7 +564,7 @@ func (app *App) draw() {
 
 	panes := []paneSpec{
 		{
-			x0: 0, y0: 0, x1: leftW, y1: h - 1,
+			x0: 0, y0: 0, x1: col1, y1: h - 1,
 			focused: bmFocused,
 			draw:    app.drawBookmarks,
 			border: func(f bool) tcell.Style {
@@ -574,7 +576,7 @@ func (app *App) draw() {
 			title: func() string { return "Bookmarks" },
 		},
 		{
-			x0: leftW, y0: 0, x1: midW, y1: h - 1,
+			x0: col1 + 1, y0: 0, x1: col2, y1: h - 1,
 			focused: flFocused,
 			draw:    app.drawFilelist,
 			border: func(f bool) tcell.Style {
@@ -586,7 +588,7 @@ func (app *App) draw() {
 			title: func() string { return app.curDir },
 		},
 		{
-			x0: midW, y0: 0, x1: w - 1, y1: previewY1,
+			x0: col2 + 1, y0: 0, x1: w - 1, y1: previewY1,
 			focused: false,
 			draw:    func(x0, y0, x1, y1 int, _ bool) { app.drawPreview(x0, y0, x1, y1) },
 			border:  func(_ bool) tcell.Style { return stDimBorder },
@@ -596,7 +598,7 @@ func (app *App) draw() {
 
 	if len(app.buffer) > 0 {
 		panes = append(panes, paneSpec{
-			x0: midW, y0: h - 1 - bufPaneH, x1: w - 1, y1: h - 1,
+			x0: col2 + 1, y0: h - 1 - bufPaneH, x1: w - 1, y1: h - 1,
 			focused: bufFocused,
 			draw:    app.drawBuffer,
 			border: func(f bool) tcell.Style {
