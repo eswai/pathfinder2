@@ -358,10 +358,18 @@ func (app *App) navigateUp() {
 			return
 		}
 	}
+	prevDir := filepath.Base(app.curDir)
 	app.curDir = parent
 	app.flCursor = 0
 	app.flScroll = 0
 	app.reloadDir()
+	for i, e := range app.fileList {
+		if e.Name == prevDir {
+			app.flCursor = i
+			app.clampFlScroll()
+			break
+		}
+	}
 }
 
 func (app *App) trashSelected() {
