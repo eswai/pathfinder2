@@ -6,8 +6,13 @@ import (
 	"path/filepath"
 )
 
+type Bookmark struct {
+	Path string `json:"path"`
+	Name string `json:"name"`
+}
+
 type Bookmarks struct {
-	Paths []string `json:"paths"`
+	Items []Bookmark `json:"items"`
 	path  string
 }
 
@@ -23,8 +28,9 @@ func LoadBookmarks() *Bookmarks {
 	if err == nil {
 		_ = json.Unmarshal(data, b)
 	}
-	if len(b.Paths) == 0 {
-		b.Paths = []string{HomeDir()}
+	if len(b.Items) == 0 {
+		home := HomeDir()
+		b.Items = []Bookmark{{Path: home, Name: filepath.Base(home)}}
 	}
 	return b
 }
@@ -41,19 +47,36 @@ func (b *Bookmarks) Save() error {
 }
 
 func (b *Bookmarks) Add(path string) {
-	for _, p := range b.Paths {
-		if p == path {
+	for _, item := range b.Items {
+		if item.Path == path {
 			return
 		}
 	}
-	b.Paths = append(b.Paths, path)
+	b.Items = append(b.Items, Bookmark{Path: path, Name: filepath.Base(path)})
 	_ = b.Save()
 }
 
 func (b *Bookmarks) Delete(idx int) {
-	if idx < 0 || idx >= len(b.Paths) {
+	if idx < 0 || idx >= len(b.Items) {
 		return
 	}
-	b.Paths = append(b.Paths[:idx], b.Paths[idx+1:]...)
+	b.Items = append(b.Items[:idx], b.Items[idx+1:]...)
+	_ = b.Save()
+}
+
+func (b *Bookmarks) Rename(idx int, name string) {
+	if idx < 0 || idx >= len(b.Items) || name == "" {
+		return
+	}
+	b.Items[idx].Name = name
+	_ = b.Save()
+}
+
+func (b *Bookmarks) Move(idx, delta int) {
+	dst := idx + delta
+	if dst < 0 || dst >= len(b.Items) {
+		return
+	}
+	b.Items[idx], b.Items[dst] = b.Items[dst], b.Items[idx]
 	_ = b.Save()
 }

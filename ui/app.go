@@ -64,8 +64,8 @@ func NewApp() (*App, error) {
 
 	bm := core.LoadBookmarks()
 	startDir := core.HomeDir()
-	if len(bm.Paths) > 0 {
-		startDir = bm.Paths[0]
+	if len(bm.Items) > 0 {
+		startDir = bm.Items[0].Path
 	}
 
 	app := &App{
@@ -125,16 +125,15 @@ func (app *App) handleKey(ev *tcell.EventKey) bool {
 			if app.focused == focusFilelist {
 				app.bookmarks.Add(app.curDir)
 			}
-		case 'd':
+		case 't':
 			if app.focused == focusBookmarks {
 				app.bookmarks.Delete(app.bmCursor)
-				if app.bmCursor >= len(app.bookmarks.Paths) && app.bmCursor > 0 {
+				if app.bmCursor >= len(app.bookmarks.Items) && app.bmCursor > 0 {
 					app.bmCursor--
 				}
 				app.clampBmScroll()
-			}
-		case 't':
-			if app.focused == focusFilelist {
+				app.syncFromBookmark()
+			} else if app.focused == focusFilelist {
 				app.trashSelected()
 			}
 		case 'b':
@@ -160,6 +159,8 @@ func (app *App) handleKey(ev *tcell.EventKey) bool {
 		case 'r':
 			if app.focused == focusFilelist {
 				app.startRename()
+			} else if app.focused == focusBookmarks {
+				app.startBmRename()
 			}
 		case 'n':
 			if app.focused == focusFilelist {
@@ -180,9 +181,25 @@ func (app *App) handleKey(ev *tcell.EventKey) bool {
 			app.focused = focusBookmarks
 		}
 	case tcell.KeyUp:
-		app.moveUp()
+		if ev.Modifiers()&tcell.ModShift != 0 && app.focused == focusBookmarks {
+			app.bookmarks.Move(app.bmCursor, -1)
+			if app.bmCursor > 0 {
+				app.bmCursor--
+			}
+			app.clampBmScroll()
+		} else {
+			app.moveUp()
+		}
 	case tcell.KeyDown:
-		app.moveDown()
+		if ev.Modifiers()&tcell.ModShift != 0 && app.focused == focusBookmarks {
+			app.bookmarks.Move(app.bmCursor, 1)
+			if app.bmCursor < len(app.bookmarks.Items)-1 {
+				app.bmCursor++
+			}
+			app.clampBmScroll()
+		} else {
+			app.moveDown()
+		}
 	case tcell.KeyRight, tcell.KeyEnter:
 		app.enterOrSelect()
 	case tcell.KeyLeft:
@@ -239,8 +256,8 @@ func (app *App) pageDown() {
 	} else {
 		app.saveCurrentBmState()
 		app.bmCursor += pageSize
-		if app.bmCursor >= len(app.bookmarks.Paths) {
-			app.bmCursor = len(app.bookmarks.Paths) - 1
+		if app.bmCursor >= len(app.bookmarks.Items) {
+			app.bmCursor = len(app.bookmarks.Items) - 1
 		}
 		app.clampBmScroll()
 		app.syncFromBookmark()
@@ -267,8 +284,8 @@ func (app *App) moveBottom() {
 		app.clampFlScroll()
 	} else {
 		app.saveCurrentBmState()
-		if len(app.bookmarks.Paths) > 0 {
-			app.bmCursor = len(app.bookmarks.Paths) - 1
+		if len(app.bookmarks.Items) > 0 {
+			app.bmCursor = len(app.bookmarks.Items) - 1
 		}
 		app.clampBmScroll()
 		app.syncFromBookmark()
@@ -308,7 +325,7 @@ func (app *App) moveDown() {
 			app.bufCursor++
 		}
 	default:
-		if app.bmCursor < len(app.bookmarks.Paths)-1 {
+		if app.bmCursor < len(app.bookmarks.Items)-1 {
 			app.saveCurrentBmState()
 			app.bmCursor++
 		}
@@ -319,8 +336,8 @@ func (app *App) moveDown() {
 
 // saveCurrentBmState persists the center-pane position for the current bookmark.
 func (app *App) saveCurrentBmState() {
-	if app.bmCursor < len(app.bookmarks.Paths) {
-		key := app.bookmarks.Paths[app.bmCursor]
+	if app.bmCursor < len(app.bookmarks.Items) {
+		key := app.bookmarks.Items[app.bmCursor].Path
 		app.bmStateMap[key] = bmState{
 			curDir:   app.curDir,
 			flCursor: app.flCursor,
@@ -331,10 +348,10 @@ func (app *App) saveCurrentBmState() {
 
 // syncFromBookmark restores (or initialises) the center-pane for the current bookmark.
 func (app *App) syncFromBookmark() {
-	if app.bmCursor >= len(app.bookmarks.Paths) {
+	if app.bmCursor >= len(app.bookmarks.Items) {
 		return
 	}
-	key := app.bookmarks.Paths[app.bmCursor]
+	key := app.bookmarks.Items[app.bmCursor].Path
 	if saved, ok := app.bmStateMap[key]; ok {
 		app.curDir = saved.curDir
 		app.flCursor = saved.flCursor
@@ -375,8 +392,8 @@ func (app *App) navigateUp() {
 		return
 	}
 	// Do not navigate above the currently selected bookmark's directory.
-	if app.bmCursor < len(app.bookmarks.Paths) {
-		bmPath := app.bookmarks.Paths[app.bmCursor]
+	if app.bmCursor < len(app.bookmarks.Items) {
+		bmPath := app.bookmarks.Items[app.bmCursor].Path
 		if !strings.HasPrefix(app.curDir+"/", bmPath+"/") || app.curDir == bmPath {
 			return
 		}
@@ -638,10 +655,10 @@ func (app *App) drawBookmarks(x0, y0, x1, y1 int, focused bool) {
 	innerH := y1 - y0
 	for i := 0; i < innerH; i++ {
 		idx := app.bmScroll + i
-		if idx >= len(app.bookmarks.Paths) {
+		if idx >= len(app.bookmarks.Items) {
 			break
 		}
-		p := app.bookmarks.Paths[idx]
+		p := app.bookmarks.Items[idx].Name
 		var st tcell.Style
 		switch {
 		case idx == app.bmCursor && focused:
@@ -789,6 +806,23 @@ func (app *App) startRename() {
 					break
 				}
 			}
+		},
+	}
+}
+
+func (app *App) startBmRename() {
+	idx := app.bmCursor
+	if idx >= len(app.bookmarks.Items) {
+		return
+	}
+	current := norm.NFC.String(app.bookmarks.Items[idx].Name)
+	app.input = inputMode{
+		active: true,
+		prompt: "Rename bookmark:",
+		value:  []rune(current),
+		cursor: len([]rune(current)),
+		onCommit: func(name string) {
+			app.bookmarks.Rename(idx, name)
 		},
 	}
 }
