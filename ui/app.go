@@ -139,6 +139,8 @@ func (app *App) handleKey(ev *tcell.EventKey) bool {
 		case 'b':
 			if app.focused == focusFilelist {
 				app.bufferSelected()
+			} else if app.focused == focusBuffer {
+				app.removeFromBuffer()
 			}
 		case 'm':
 			if app.focused == focusFilelist {
@@ -147,10 +149,6 @@ func (app *App) handleKey(ev *tcell.EventKey) bool {
 		case 'c':
 			if app.focused == focusFilelist {
 				app.executeCopy()
-			}
-		case 'z':
-			if app.focused == focusBuffer {
-				app.removeFromBuffer()
 			}
 		case 'o':
 			if app.focused == focusFilelist {
