@@ -10,6 +10,14 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
+type inputMode struct {
+	active   bool
+	prompt   string
+	value    []rune
+	cursor   int
+	onCommit func(string)
+}
+
 type focus int
 
 const (
@@ -37,6 +45,7 @@ type App struct {
 	bmStateMap   map[string]bmState // per-bookmark saved state, keyed by bookmark path
 	buffer       []string           // staged paths for move/copy
 	bufCursor    int                // buffer pane cursor
+	input        inputMode
 }
 
 func NewApp() (*App, error) {
@@ -99,6 +108,10 @@ func (app *App) Run() {
 }
 
 func (app *App) handleKey(ev *tcell.EventKey) bool {
+	if app.input.active {
+		app.handleInputKey(ev)
+		return true
+	}
 	switch ev.Key() {
 	case tcell.KeyCtrlC:
 		return false
@@ -141,6 +154,14 @@ func (app *App) handleKey(ev *tcell.EventKey) bool {
 		case 'o':
 			if app.focused == focusFilelist {
 				app.openWithApp()
+			}
+		case 'r':
+			if app.focused == focusFilelist {
+				app.startRename()
+			}
+		case 'n':
+			if app.focused == focusFilelist {
+				app.startCreate()
 			}
 		}
 	case tcell.KeyTab:
@@ -602,6 +623,10 @@ func (app *App) draw() {
 		}
 	}
 
+	if app.input.active {
+		app.drawInputPopup()
+	}
+
 	s.Show()
 }
 
@@ -729,4 +754,172 @@ func (app *App) openWithApp() {
 	path := filepath.Join(app.curDir, e.Name)
 	cmd := exec.Command("open", path)
 	cmd.Start()
+}
+
+func (app *App) startRename() {
+	if app.flCursor >= len(app.fileList) {
+		return
+	}
+	e := app.fileList[app.flCursor]
+	if e.Name == ".." {
+		return
+	}
+	app.input = inputMode{
+		active: true,
+		prompt: "Rename:",
+		value:  []rune(e.Name),
+		cursor: len([]rune(e.Name)),
+		onCommit: func(name string) {
+			if name == "" || name == e.Name {
+				return
+			}
+			src := filepath.Join(app.curDir, e.Name)
+			dst := filepath.Join(app.curDir, name)
+			os.Rename(src, dst)
+			app.reloadDir()
+			for i, entry := range app.fileList {
+				if entry.Name == name {
+					app.flCursor = i
+					app.clampFlScroll()
+					break
+				}
+			}
+		},
+	}
+}
+
+func (app *App) startCreate() {
+	app.input = inputMode{
+		active: true,
+		prompt: "New directory:",
+		value:  []rune{},
+		cursor: 0,
+		onCommit: func(name string) {
+			if name == "" {
+				return
+			}
+			os.MkdirAll(filepath.Join(app.curDir, name), 0755)
+			app.reloadDir()
+			for i, entry := range app.fileList {
+				if entry.Name == name {
+					app.flCursor = i
+					app.clampFlScroll()
+					break
+				}
+			}
+		},
+	}
+}
+
+func (app *App) handleInputKey(ev *tcell.EventKey) {
+	switch ev.Key() {
+	case tcell.KeyEscape, tcell.KeyCtrlC:
+		app.input = inputMode{}
+	case tcell.KeyEnter:
+		cb := app.input.onCommit
+		val := string(app.input.value)
+		app.input = inputMode{}
+		if cb != nil {
+			cb(val)
+		}
+	case tcell.KeyBackspace, tcell.KeyBackspace2:
+		if app.input.cursor > 0 {
+			v := app.input.value
+			app.input.value = append(v[:app.input.cursor-1], v[app.input.cursor:]...)
+			app.input.cursor--
+		}
+	case tcell.KeyLeft:
+		if app.input.cursor > 0 {
+			app.input.cursor--
+		}
+	case tcell.KeyRight:
+		if app.input.cursor < len(app.input.value) {
+			app.input.cursor++
+		}
+	case tcell.KeyHome:
+		app.input.cursor = 0
+	case tcell.KeyEnd:
+		app.input.cursor = len(app.input.value)
+	case tcell.KeyRune:
+		v := app.input.value
+		r := ev.Rune()
+		newVal := make([]rune, len(v)+1)
+		copy(newVal, v[:app.input.cursor])
+		newVal[app.input.cursor] = r
+		copy(newVal[app.input.cursor+1:], v[app.input.cursor:])
+		app.input.value = newVal
+		app.input.cursor++
+	}
+}
+
+func (app *App) drawInputPopup() {
+	w, h := app.screen.Size()
+	popW := w * 2 / 3
+	if popW < 40 {
+		popW = 40
+	}
+	if popW > w-4 {
+		popW = w - 4
+	}
+	popH := 4
+	x0 := (w - popW) / 2
+	y0 := (h - popH) / 2
+	x1 := x0 + popW
+	y1 := y0 + popH - 1
+
+	stPopBG := tcell.StyleDefault.Background(nord1).Foreground(nord4)
+	stPopBorder := tcell.StyleDefault.Background(nord1).Foreground(nord8)
+	stPopText := tcell.StyleDefault.Background(nord1).Foreground(nord4)
+	stPrompt := tcell.StyleDefault.Background(nord1).Foreground(nord8).Bold(true)
+	stCursor := tcell.StyleDefault.Background(nord8).Foreground(nord0)
+
+	// fill background
+	for y := y0; y <= y1; y++ {
+		for x := x0; x <= x1; x++ {
+			app.screen.SetContent(x, y, ' ', nil, stPopBG)
+		}
+	}
+
+	drawBox(app.screen, x0, y0, x1, y1, stPopBorder, stPopBorder, app.input.prompt)
+
+	// draw input value on inner row
+	innerX := x0 + 1
+	innerY := y0 + 1
+	innerW := x1 - 1
+
+	// draw prompt label
+	prompt := app.input.prompt + " "
+	px := innerX
+	for _, r := range prompt {
+		if px >= innerW {
+			break
+		}
+		app.screen.SetContent(px, innerY, r, nil, stPrompt)
+		px++
+	}
+
+	// draw input text with cursor
+	val := app.input.value
+	cur := app.input.cursor
+	for i, r := range val {
+		if px >= innerW {
+			break
+		}
+		st := stPopText
+		if i == cur {
+			st = stCursor
+		}
+		app.screen.SetContent(px, innerY, r, nil, st)
+		px++
+	}
+	// cursor at end
+	if cur == len(val) && px < innerW {
+		app.screen.SetContent(px, innerY, ' ', nil, stCursor)
+		px++
+	}
+	// clear rest
+	for px < innerW {
+		app.screen.SetContent(px, innerY, ' ', nil, stPopText)
+		px++
+	}
 }
