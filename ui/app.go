@@ -388,7 +388,11 @@ func (app *App) navigateUp() {
 	// Do not navigate above the currently selected bookmark's directory.
 	if app.bmCursor < len(app.bookmarks.Items) {
 		bmPath := app.bookmarks.Items[app.bmCursor].Path
-		if !strings.HasPrefix(app.curDir+"/", bmPath+"/") || app.curDir == bmPath {
+		prefix := bmPath
+		if !strings.HasSuffix(prefix, "/") {
+			prefix += "/"
+		}
+		if !strings.HasPrefix(app.curDir+"/", prefix) || app.curDir == bmPath {
 			return
 		}
 	}
