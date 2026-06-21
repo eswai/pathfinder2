@@ -2,7 +2,6 @@ package ui
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -762,8 +761,7 @@ func (app *App) openWithApp() {
 	}
 	e := app.fileList[app.flCursor]
 	path := filepath.Join(app.curDir, e.Name)
-	cmd := exec.Command("open", path)
-	cmd.Start()
+	openFile(path)
 }
 
 func (app *App) startRename() {
