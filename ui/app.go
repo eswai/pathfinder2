@@ -389,10 +389,10 @@ func (app *App) navigateUp() {
 	if app.bmCursor < len(app.bookmarks.Items) {
 		bmPath := app.bookmarks.Items[app.bmCursor].Path
 		prefix := bmPath
-		if !strings.HasSuffix(prefix, "/") {
-			prefix += "/"
+		if !strings.HasSuffix(prefix, "/") && !strings.HasSuffix(prefix, string(filepath.Separator)) {
+			prefix += string(filepath.Separator)
 		}
-		if !strings.HasPrefix(app.curDir+"/", prefix) || app.curDir == bmPath {
+		if !strings.HasPrefix(app.curDir+string(filepath.Separator), prefix) || app.curDir == bmPath {
 			return
 		}
 	}
