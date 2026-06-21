@@ -788,6 +788,18 @@ func (app *App) drawPreview(x0, y0, x1, y1 int) {
 		return
 	}
 
+	if core.IsZip(target) {
+		lines, err := core.ReadZipPreview(target, innerH)
+		if err != nil {
+			drawText(app.screen, x0, y0, x1, "Error: "+err.Error(), stDefault)
+			return
+		}
+		for i, l := range lines {
+			drawText(app.screen, x0, y0+i, x1, l, stDefault)
+		}
+		return
+	}
+
 	if core.IsBinary(target) {
 		drawText(app.screen, x0, y0, x1, "Binary file", stDefault)
 		return

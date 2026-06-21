@@ -1,10 +1,13 @@
 package core
 
 import (
+	"archive/zip"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 type Entry struct {
@@ -57,6 +60,27 @@ func IsBinary(path string) bool {
 		}
 	}
 	return false
+}
+
+func IsZip(path string) bool {
+	return strings.EqualFold(filepath.Ext(path), ".zip")
+}
+
+func ReadZipPreview(path string, maxLines int) ([]string, error) {
+	r, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	var lines []string
+	for _, f := range r.File {
+		if len(lines) >= maxLines {
+			break
+		}
+		size := fmt.Sprintf("%d", f.UncompressedSize64)
+		lines = append(lines, fmt.Sprintf("%-40s %s", f.Name, size))
+	}
+	return lines, nil
 }
 
 func ReadPreview(path string, maxLines int) ([]string, error) {
