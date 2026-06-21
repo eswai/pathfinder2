@@ -4,12 +4,24 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/eswai/pathfinder2/core"
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-runewidth"
 	"golang.org/x/text/unicode/norm"
 )
+
+type previewReadyEvent struct {
+	tcell.EventTime
+}
+
+func newPreviewReadyEvent() *previewReadyEvent {
+	ev := &previewReadyEvent{}
+	ev.SetEventNow()
+	return ev
+}
 
 type inputMode struct {
 	active   bool
@@ -47,6 +59,10 @@ type App struct {
 	buffer       []string           // staged paths for move/copy
 	bufCursor    int                // buffer pane cursor
 	input        inputMode
+
+	previewReady bool
+	previewMu    sync.Mutex
+	previewTimer *time.Timer
 }
 
 func NewApp() (*App, error) {
@@ -92,8 +108,24 @@ func (app *App) reloadDir() {
 	}
 }
 
+func (app *App) schedulePreview() {
+	app.previewMu.Lock()
+	defer app.previewMu.Unlock()
+	app.previewReady = false
+	if app.previewTimer != nil {
+		app.previewTimer.Stop()
+	}
+	app.previewTimer = time.AfterFunc(500*time.Millisecond, func() {
+		app.previewMu.Lock()
+		app.previewReady = true
+		app.previewMu.Unlock()
+		app.screen.PostEvent(newPreviewReadyEvent())
+	})
+}
+
 func (app *App) Run() {
 	defer app.screen.Fini()
+	app.previewReady = true
 	for {
 		app.draw()
 		ev := app.screen.PollEvent()
@@ -104,6 +136,8 @@ func (app *App) Run() {
 			if !app.handleKey(e) {
 				return
 			}
+		case *previewReadyEvent:
+			_ = e
 		}
 	}
 }
@@ -236,6 +270,7 @@ func (app *App) pageUp() {
 		app.clampBmScroll()
 		app.syncFromBookmark()
 	}
+	app.schedulePreview()
 }
 
 func (app *App) pageDown() {
@@ -259,6 +294,7 @@ func (app *App) pageDown() {
 		app.clampBmScroll()
 		app.syncFromBookmark()
 	}
+	app.schedulePreview()
 }
 
 func (app *App) moveTop() {
@@ -271,6 +307,7 @@ func (app *App) moveTop() {
 		app.clampBmScroll()
 		app.syncFromBookmark()
 	}
+	app.schedulePreview()
 }
 
 func (app *App) moveBottom() {
@@ -287,6 +324,7 @@ func (app *App) moveBottom() {
 		app.clampBmScroll()
 		app.syncFromBookmark()
 	}
+	app.schedulePreview()
 }
 
 func (app *App) moveUp() {
@@ -296,6 +334,7 @@ func (app *App) moveUp() {
 			app.flCursor--
 		}
 		app.clampFlScroll()
+		app.schedulePreview()
 	case focusBuffer:
 		if app.bufCursor > 0 {
 			app.bufCursor--
@@ -307,6 +346,7 @@ func (app *App) moveUp() {
 		}
 		app.clampBmScroll()
 		app.syncFromBookmark()
+		app.schedulePreview()
 	}
 }
 
@@ -317,6 +357,7 @@ func (app *App) moveDown() {
 			app.flCursor++
 		}
 		app.clampFlScroll()
+		app.schedulePreview()
 	case focusBuffer:
 		if app.bufCursor < len(app.buffer)-1 {
 			app.bufCursor++
@@ -328,6 +369,7 @@ func (app *App) moveDown() {
 		}
 		app.clampBmScroll()
 		app.syncFromBookmark()
+		app.schedulePreview()
 	}
 }
 
@@ -716,6 +758,12 @@ func (app *App) drawBuffer(x0, y0, x1, y1 int, focused bool) {
 }
 
 func (app *App) drawPreview(x0, y0, x1, y1 int) {
+	app.previewMu.Lock()
+	ready := app.previewReady
+	app.previewMu.Unlock()
+	if !ready {
+		return
+	}
 	if app.flCursor >= len(app.fileList) {
 		return
 	}
