@@ -20,8 +20,14 @@ func ListDir(dir string) ([]Entry, error) {
 
 	var dirs, files []Entry
 	for _, e := range entries {
-		entry := Entry{Name: e.Name(), IsDir: e.IsDir()}
-		if e.IsDir() {
+		isDir := e.IsDir()
+		if e.Type()&os.ModeSymlink != 0 {
+			if info, err := os.Stat(filepath.Join(dir, e.Name())); err == nil {
+				isDir = info.IsDir()
+			}
+		}
+		entry := Entry{Name: e.Name(), IsDir: isDir}
+		if isDir {
 			dirs = append(dirs, entry)
 		} else {
 			files = append(files, entry)
